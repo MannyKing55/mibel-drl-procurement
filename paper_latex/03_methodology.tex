@@ -286,7 +286,7 @@ M6 & 884 & 27.71\% & $-27.10$ & $-23,958$ & 23,886 & $-44.29\%$ \\
 $D_2$ (2023) & 363 & 60.71\% & 8.86 & 3,225 & 284.15 & 10.07\% \\
 $D_2$ (2024) & 366 & 62.02\% & 9.02 & 3,301 & 312.40 & 14.13\% \\
 $D_2$ (2025) & 365 & 64.11\% & 8.68 & 3,168 & 295.60 & 13.17\% \\
-$D_2$ (2026, 148 cal.\ days) & 148 (105) & 56.08\% & 4.94 & 731 & 225.45 & 11.18\% \\
+$D_2$ (2026, 148 cal.\ days) & 148 [102] & 56.08\% & 4.94 & 731 & 225.45 & 11.18\% \\
 \bottomrule
 \end{tabularx}
 
@@ -305,7 +305,7 @@ Raw OMIE SPOT Clearing & 01/01/23 -- 31/05/26 & 1,247 & 1,247 & 1,247 & Daily ma
 OMIP Aligned Evaluation Sample & 03/01/23 -- 30/05/26 & 1,242 & 1,242 & \textbf{1,242} & Retained market delivery sample ($1{,}242$ days) formed by two continuous sampling intervals: $n_1 = 1{,}094$ historical baseline days (03/01/23 -- 31/12/25: 363 in 2023, 366 in 2024, 365 in 2025; excluding 01/01/23 [Sunday] and 02/01/23 [holiday observation]) and $n_2 = 148$ days in 2026 (03/01/26 -- 30/05/26; excluding 01/01/26 [holiday], 02/01/26 [unaligned forward boundary], and 31/05/26 [Sunday boundary]). The inclusive interval 03/01/23--30/05/26 contains exactly 1,242 calendar dates (excluding the 5 boundary dates from the 1,247 raw calendar timeline). Note that naively summing annual calendar counts ($365 + 366 + 365 + 148 = 1{,}244$) includes 01/01/23 and 02/01/23, which are excluded from the evaluated aligned sample. \\
 \midrule
 Phase 1--2 Validation & 01/01/25 -- 31/12/25 & 365 & 365 & 261 & Static model ablation \& heuristic screening across 365 delivery days: 261 Monday--Friday operational weekday decision epochs (comprising 256 official OMIP trading sessions and 5 weekday TARGET bank holiday closures) and 104 weekend days (totaling 109 non-trading exchange days where default SPOT settlement applies). \\
-Phase 3--4 Out-of-Sample & 03/01/26 -- 30/05/26 & 148 & 148 & \textbf{105} & 148 calendar delivery days comprising 105 Monday--Friday operational weekday decision epochs represented in the simulator and 43 weekend days. Within the 105 weekdays, official exchange calendars (OMIP/OMIClear) observe 3 weekday TARGET bank holiday closures (Good Friday [April 3], Easter Monday [April 6], and Labour Day [May 1]), yielding 102 official exchange trading sessions and 46 non-trading exchange days; across non-trading exchange days, the simulator executes carryover forward settlement or unhedged default SPOT clearing. \\
+Phase 3--4 Out-of-Sample & 03/01/26 -- 30/05/26 & 148 & 148 & \textbf{102} (46) & 148 calendar delivery days comprising 102 official OMIP trading sessions (decision epochs where forward contracts can be selected) and 46 non-trading dates (3 weekday TARGET exchange closures [Good Friday, Easter Monday, Labour Day] and 43 weekend days, where passive default SPOT clearing applies). Across non-trading dates, the simulator executes carryover forward settlement or unhedged default SPOT clearing. \\
 \midrule
 Walk-Forward Evaluation ($W=1$, Monthly Blocks) & 01/02/23 -- 30/05/26 (40 blocks) & 1,215 & 374 & 374 & Exactly 374 evaluated out-of-sample delivery days across the 40 test months (103 in 2023, 114 in 2024, 113 in 2025, and 44 in 2026), evaluating Days 21 to month-end after a 20-day recurrent hidden state warm-up buffer. \\
 \bottomrule

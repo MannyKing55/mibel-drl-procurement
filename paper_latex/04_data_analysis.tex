@@ -24,10 +24,10 @@ $1$~MW ($E_{\text{load}, d} = 24$~MWh/day), with total costs for a stylized 200-
 2023 & 365 & 89.84 & \phantom{0}1.51 & 147.77 & 787.0 (157.4 M\texteuro) \\
 2024 & 366 & 62.72 & \phantom{0}0.10 & 146.67 & 551.0 (110.2 M\texteuro) \\
 2025 & 365 & 67.59 & \phantom{0}6.96 & 143.39 & 592.1 (118.4 M\texteuro) \\
-2026\textsuperscript{*} & 148 (105) & 44.22 & \phantom{0}0.18 & 131.79 & 157.1 (31.42 M\texteuro) \\
+2026\textsuperscript{*} & 148 & 44.22 & \phantom{0}0.18 & 131.79 & 157.1 (31.42 M\texteuro) \\
 \bottomrule
 \end{tabular*}
-\par\smallskip\raggedright\scriptsize \textsuperscript{*}2026 values report 148 calendar delivery days of continuous SPOT market clearing (Jan 3 -- May 30, 2026), with 105 weekday decision epochs (102 official OMIP trading sessions and 3 TARGET bank holiday closures). Reference cost reports unit-capacity procurement expenditure (k\texteuro/MW) with total expenditure for a 200-MW baseload facility in parentheses.
+\par\smallskip\raggedright\scriptsize \textsuperscript{*}2026 values report 148 calendar delivery days of continuous SPOT market clearing (Jan 3 -- May 30, 2026), comprising 102 official OMIP trading sessions (decision epochs where forward contracts can be selected) and 46 non-trading exchange dates (3 weekday TARGET bank holiday closures and 43 weekend days). Reference cost reports unit-capacity procurement expenditure (k\texteuro/MW) with total expenditure for a 200-MW baseload facility in parentheses.
 \end{table*}
 
 The decline in the mean SPOT price from \texteuro67.59/MWh (2025) to \texteuro44.22/MWh (2026, a reduction of 34.6\%) provides the empirical setting for assessing procurement policy adaptability under non-stationary market conditions.
@@ -78,7 +78,7 @@ This $2 \times 2$ factorial structure enables simultaneous evaluation of: (i)~th
 \texttt{Dataset\_M8\_Physical\_NLP} (Hybrid NLP) & \checkmark & \checkmark & \checkmark & --- & \checkmark (10) & 45 (31 norm) \\
 \bottomrule
 \end{tabularx}
-\par\smallskip\raggedright\scriptsize \textit{Note:} Of the 148 calendar delivery days (Jan 3 -- May 30, 2026), 105 are weekday decision epochs represented in the simulator (102 official OMIP trading sessions and 3 weekday exchange closures), and 43 are weekend default days; across the 46 non-trading exchange days, the simulator executes carryover forward delivery settlement or unhedged default SPOT clearing.
+\par\smallskip\raggedright\scriptsize \textit{Note:} The 148 calendar delivery days (Jan 3 -- May 30, 2026) comprise 102 official OMIP trading sessions (decision epochs where forward contracts can be selected) and 46 non-trading exchange dates (3 weekday TARGET closures and 43 weekend days, where passive default SPOT clearing applies).
 \end{table*}
 
 The news corpus comprises daily Spanish-language energy, financial, and macroeconomic articles harvested from leading Iberian economic outlets (including \textit{elEconomista}, \textit{Europa Press}, and institutional press releases from OMIE, OMIP, and REE). The texts were processed natively in Spanish using Meta's Llama-3 8B Instruct model \cite{dubey2024llama3} executed locally via Ollama. By utilizing system prompts formulated directly in Spanish with strict JSON grammar constraints ($T=0$), the pipeline extracts the 10 domain-specific sentiment scores ($\phi_1 \dots \phi_{10}$) without relying on external machine translation, preserving domain terminology and geopolitical nuances.
@@ -183,7 +183,7 @@ In 2026, total electricity demand ($p = 0.076$) and solar PV generation
 ($p = 0.93$), the two highest-weight predictors of SPOT prices under
 historical regimes, remained statistically indistinguishable from their
 training distributions under $\alpha_{\text{joint}}$, while SPOT prices collapsed from a historical mean of
-\texteuro72.65/MWh to \texteuro44.22/MWh ($n_1 = 1{,}094$ historical baseline days [03/01/2023--31/12/2025: 363 in 2023, 366 in 2024, 365 in 2025], $n_2 = 148$ out-of-sample days [03/01/2026--30/05/2026], $D = 0.3653, p = 4.69 \times 10^{-16}$, with a dependence-robust Moving-Block Bootstrap 95\% CI of $[0.2570,\; 0.5265]$ and empirical block significance $p_{\text{emp}} \le 0.0002$). Note an important distinction in temporal evaluation: while the continuous Walk-Forward sliding window spans the entire 2023--2026 period (1,242 market days), we explicitly isolate early 2026 in this section to analyse the wholesale price dislocation. Furthermore, there is a divergence between calendar and operational days during this 2026 horizon (January 3 -- May 30, 2026). The physical OMIE SPOT market operates 365 days a year, providing 148 continuous calendar delivery days which are used in this KS test to maximise the statistical power of the marginal distributional comparison. Conversely, the OMIP derivatives market is subject to exchange closures (weekends and holidays). Filtering for operational decision days, the agent's forward trading evaluation for this specific isolated period consists of 105 weekday decision epochs represented in the simulator (comprising 102 official OMIP trading sessions and 3 weekday TARGET bank holiday closures: Good Friday [April 3], Easter Monday [April 6], and Labour Day [May 1]) alongside 43 weekend days (totaling 46 non-trading exchange days where default SPOT settlement applies).
+consists of 102 official OMIP trading sessions (decision epochs where forward contracts can be actively selected) and 46 non-trading dates (3 weekday TARGET bank holiday closures: Good Friday [April 3], Easter Monday [April 6], and Labour Day [May 1]; alongside 43 weekend days, where default SPOT settlement applies under NO\_TRADE).
 
 In the monthly rolling Walk-Forward protocol ($W=1$), each evaluation block $m$ evaluates out-of-sample procurement decisions from Day 21 to the final day of month $m$, using Days 1--20 as an initial feature history and observation warm-up buffer for the recurrent network, while positions in $\mathbf{m}_t$ carry over continuously from the preceding month. Across the 40 test months (February 2023 to May 2026), this generates exactly 374 evaluated out-of-sample trading days. By contrast, the isolated 2026 price shock evaluation in Section~\ref{subsec:results_2026} (Table~\ref{tab:blind_2026_comparison}) evaluates the complete continuous trajectory of 148 consecutive calendar delivery days.
 
@@ -195,14 +195,14 @@ In the monthly rolling Walk-Forward protocol ($W=1$), each evaluation block $m$ 
 \label{tab:evaluation_days}
 \begin{tabularx}{\linewidth}{@{} >{\raggedright\arraybackslash}X cc c c >{\centering\arraybackslash}p{2.5cm}@{}}
 \toprule
-\textbf{Evaluation Phase} & \textbf{Start} & \textbf{End} & \textbf{Calendar} & \textbf{OMIE} & \textbf{OMIP Trades} \\
- & & & \textbf{Days} & \textbf{Obs.} & \textbf{(Default SPOT)} \\
+\textbf{Evaluation Phase} & \textbf{Start} & \textbf{End} & \textbf{Calendar} & \textbf{OMIE} & \textbf{OMIP Sessions} \\
+ & & & \textbf{Days} & \textbf{Obs.} & \textbf{(Non-trading Dates)} \\
 \midrule
 KS Test (Marginal Distributional Shift) & 3 Jan 2026 & 30 May 2026 & 148 & 148 & --- \\
-Walk-Forward RL Evaluation & 3 Jan 2026 & 30 May 2026 & 148 & 148 & 105 (43) \\
+Walk-Forward RL Evaluation & 3 Jan 2026 & 30 May 2026 & 148 & 148 & 102 (46) \\
 \bottomrule
 \end{tabularx}
-\par\smallskip\raggedright\scriptsize \textit{Note:} Of the 148 calendar delivery days (Jan 3 -- May 30, 2026), 105 are weekday decision epochs represented in the simulator (102 official OMIP trading sessions and 3 weekday exchange closures), and 43 are weekend default days; across the 46 non-trading exchange days, the simulator executes carryover forward delivery settlement or unhedged default SPOT clearing.
+\par\smallskip\raggedright\scriptsize \textit{Note:} The 148 calendar delivery days (Jan 3 -- May 30, 2026) comprise 102 official OMIP trading sessions (decision epochs where forward contracts can be selected) and 46 non-trading exchange dates (3 weekday TARGET closures and 43 weekend days, where passive default SPOT clearing applies).
 \end{table*}
 
 For context, the transition from 2023+2024 to 2025 exhibited a substantially smaller maximum distance ($n_1 = 730$, $n_2 = 365$, $D = 0.1746$, $p = 6.18 \times 10^{-7}$, bootstrap 95\% CI: $[0.0951,\; 0.2981]$, $p_{\text{emp}} = 0.0150$).
