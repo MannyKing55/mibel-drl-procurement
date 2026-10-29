@@ -1,0 +1,88 @@
+% ── Section 1: Introduction ───────────────────────────────────────────────────
+\section{Introduction}
+\label{sec:introduction}
+
+The accelerating integration of variable renewable energy sources into European
+wholesale electricity markets has introduced unprecedented price volatility,
+reshaping the financial exposure of large-scale energy consumers.
+In liberalised electricity markets, such as the Iberian market (MIBEL, comprising the Spanish and Portuguese wholesale bidding zones), wholesale 
+prices (SPOT) are determined daily based on short-term supply and demand matching. 
+For energy-intensive industries procuring electricity at scale, daily exposure to 
+these SPOT market fluctuations can lead to substantial financial volatility, with annual 
+costs swinging by tens of millions of euros.
+To mitigate this exposure, large consumers rely on \textit{forward hedging}: locking 
+in energy prices at fixed rates through futures contracts traded on exchanges such as 
+OMIP (\textit{Operador del Mercado Ib{\'e}rico de Energ{\'i}a --- Polo Portugu{\^e}s}). By purchasing energy days, weeks, or 
+months in advance, consumers secure price certainty. However, determining \textit{when} 
+to purchase which contract and at which forward horizon constitutes a highly complex, 
+sequential decision-making problem under deep uncertainty. Large industrial consumers operate at the intersection of physical spot clearing (OMIE, \textit{Operador del Mercado Ib\'erico de Energ\'ia --- Polo Espa\~nol}) and derivative hedging markets (OMIP), requiring multi-horizon decision-making under non-stationary market conditions (as detailed in Section~\ref{sec:methodology}).
+
+Electricity price forecasting studies have consistently identified strong nonlinearities, spikes, seasonality and dependence on physical and market-coupling variables \cite{weron2014electricity, li2021dayahead}.
+Understanding the structural drivers of SPOT prices is a prerequisite for any 
+robust procurement strategy. In the Spanish market, machine-learning models using system fundamentals have been shown to provide both predictive and explanatory information about day-ahead price formation \cite{diaz2019prediction}. 
+Recent peer-reviewed work in \textit{Engineering Applications of Artificial Intelligence} has also investigated decomposition-based hybrid deep-learning architectures for day-ahead electricity-price forecasting using real market data \cite{aksu2026dayahead}. Such work focuses on improving forecast accuracy; the present study instead evaluates the economic consequences of sequential procurement actions across several delivery horizons, under settlement and inventory constraints. 
+More broadly, the forecasting literature stresses that predictive accuracy does not automatically translate into optimal procurement decisions under risk and contractual constraints \cite{weron2014electricity, hanetho2023commodities}.
+
+This distinction has encouraged the use of reinforcement learning, which optimises a sequential decision policy directly against a specified reward function rather than against forecast error alone~\cite{sutton2018reinforcement}.
+The financial exposure of consumers to wholesale volatility has sparked a growing 
+body of DRL research. A comprehensive review of reinforcement learning in deregulated energy markets shows that existing applications concentrate mainly on bidding, dispatch, demand response and storage operation \cite{zhu2023reinforcement, ochoa2022multiagent}. For instance, recent work in \textit{Engineering Applications of Artificial Intelligence} has applied deep reinforcement learning to producer-side strategic bidding, explicitly modelling competitor behaviour and multi-dimensional price--quantity offers \cite{hu2025strategicbidding}. This is a closely related market-decision problem, but differs from the consumer-side task studied here: allocating baseload purchases across spot and forward-delivery instruments rather than optimizing a producer's market offers. Consumer-side procurement through multiple forward delivery horizons and explicit inventory constraints remains comparatively less explored. For instance, \cite{ding2025risk} proposed a risk-aware RL 
+algorithm for data centre energy management that minimises costs by deferring 
+computational workloads away from peak-price periods. While effective, this approach 
+optimises internal operations rather than the financial procurement instrument itself.
+Focusing directly on financial trading, \cite{hanetho2023commodities} showed that 
+Deep Policy Gradient methods employing LSTM architectures generate superior Sharpe 
+ratios compared to passive buy-and-hold strategies when trading natural gas futures.
+To address the inherent sensitivity of DRL policies to distribution shifts, 
+\cite{qiu2025robust} proposed an adversarial robust RL framework for electricity 
+market bidding, defining an explicit uncertainty set around state transitions.
+Additionally, at the intersection of Natural Language Processing, Large Language Models (LLMs), and energy market analysis, several distinct research directions have emerged. In commodity derivative markets, Cui et al.~\cite{cui2025toward} proposed integrating LLM-derived macroeconomic sentiment and market connectedness as exogenous state variables for speculative futures trading in crude oil, while Hanetho and Fleten~\cite{hanetho2023commodities} explored recurrent deep policy networks on natural gas futures without textual signals. In power systems, Chen et al.~\cite{chen2025modeling} developed an emotion-semantic representation paired with reinforcement learning for multi-objective virtual power plant (VPP) operational bidding and revenue optimization. Parallel forecasting studies, such as Wang and Yu~\cite{wang2025electricity} using TimeXer neural forecasters with LLM sentiment on CAISO, Zhang et al.~\cite{tempr2025llm} deploying LLM bidding and market sentiment agents for electricity price and spike prediction, and Manowska and Hassan~\cite{manowska2026modeling} evaluating news indicators for Polish electricity price formation, demonstrate that textual sentiment contains leading signals for power market dynamics.
+
+Two recent studies in \textit{Engineering Applications of Artificial Intelligence} are particularly relevant to the text--market interface. Liu and Qin~\cite{liu2026scaleaware} fuse news and policy text with numerical market variables for scale-aware carbon-price forecasting, while Kang et al.~\cite{kang2026structuredsentiment} use LLM-derived, supply-chain-specific sentiment from public energy, regulatory and corporate documents to forecast crude-oil prices and evaluate its predictive and trading value. These studies show that textual information and numerical market data are already being combined for energy-related price analysis; therefore, the present work does not claim novelty from using news sentiment or multimodal inputs alone. Its narrower contribution is to test the incremental value of such features inside a sequential industrial-consumer procurement policy over spot and multiple forward-delivery instruments, using chronological Walk-Forward evaluation and explicit savings--downside-risk comparisons.
+
+Procurement-oriented reinforcement learning has also been investigated in a closely related setting. Wang et al.~\cite{wang2026procurement} develop a multi-market agency-procurement framework for Chinese power-grid companies, coupling multidimensional risk quantification with an A3C purchasing agent. This work confirms that procurement-cost and risk optimisation with reinforcement learning is an established research direction. The distinction addressed here is narrower: consumer-side baseload commitments in the Iberian market, allocation across 14 spot and OMIP forward-delivery instruments, and an explicit test of whether zero-shot LLM-derived news dimensions add information beyond physical and commodity inputs under chronological evaluation. These differences define the scope of the present contribution; they do not imply that procurement with reinforcement learning or the use of sentiment in energy markets is novel in itself. Table~\ref{tab:literature_comparison} provides a structured comparison with the closest related studies in the literature.
+
+\begin{table*}[!t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.0pt}
+\caption{Comparison of the proposed framework with related studies combining reinforcement learning, machine learning, and textual sentiment in energy markets.}
+\label{tab:literature_comparison}
+\begin{tabularx}{\textwidth}{@{}l >{\hsize=0.85\hsize\raggedright\arraybackslash}X >{\hsize=1.05\hsize\raggedright\arraybackslash}X >{\hsize=0.95\hsize\raggedright\arraybackslash}X >{\hsize=0.95\hsize\raggedright\arraybackslash}X >{\hsize=1.00\hsize\raggedright\arraybackslash}X >{\hsize=1.20\hsize\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Study} & \textbf{Market} & \textbf{Decision Scope / Task} & \textbf{Instruments} & \textbf{Model / Architecture} & \textbf{Text / Sentiment Signal} & \textbf{Evaluation \& Validation} \\
+\midrule
+Hanetho et al.~\cite{hanetho2023commodities} & UK/EU Gas & Speculative financial trading & Single futures contract & Recurrent RL (LSTM) & None & Rolling train/test (Lagged settlement) \\
+Cui et al.~\cite{cui2025toward} & WTI Crude Oil & Speculative futures trading & Continuous futures & Feed-Forward DRL & Zero-shot LLM (Daily macro news) & Static train/test partition \\
+Chen et al.~\cite{chen2025modeling} & Virtual Power Plant & Multi-objective dispatch / revenue & VPP internal dispatch & DRL with emotion-semantic & News sentiment analysis & Multi-objective operational simulation \\
+Wang \& Yu~\cite{wang2025electricity} & US Power (CAISO) & Price forecasting (RMSE/MAE) & Day-ahead pool price & TimeXer neural forecaster & LLM-based sentiment series & Out-of-sample forecast benchmarking \\
+Zhang et al.~\cite{tempr2025llm} & Power Market & Price / spike prediction & Spot price spikes & LLM bidding / sentiment agents & Multi-agent market sentiment & Out-of-sample prediction testing \\
+Manowska \& Hassan~\cite{manowska2026modeling} & Poland Power & Price formation econometrics & Day-ahead wholesale & Econometric / ML regression & Textual news sentiment & Chronological out-of-sample testing \\
+Wang et al.~\cite{wang2026procurement} & China Grid & Agency power procurement & Multi-market electricity & A3C purchasing agent & Public opinion risk (non-LLM) & Static empirical simulation \\
+Hu et al.~\cite{hu2025strategicbidding} & Power Market & Producer-side strategic bidding & Price--quantity offers & VAE--DBSCAN and imitation DRL & None & Competitor behaviour modelling \\
+Aksu et al.~\cite{aksu2026dayahead} & Denmark (DK1) & Day-ahead price forecasting & Wholesale electricity & EMD/VMD, GRU/LSTM, Bayes.\ Opt. & None & Real-market forecasting benchmark \\
+Liu \& Qin~\cite{liu2026scaleaware} & China ETS & Carbon-price forecasting & Carbon spot prices & Scale decomposition, BiLSTM & News sentiment \& policy semantics & Hubei/Guangzhou ETS ablation \\
+Kang et al.~\cite{kang2026structuredsentiment} & Crude Oil (WTI) & Price forecasting \& trading & Spot / futures prices & ML with LLM-derived sentiment & Energy, regulatory \& corporate sentiment & Supply-chain sentiment \& trading metrics \\
+\textbf{This Study} & Iberian Power (MIBEL) & Industrial consumer procurement & 14 Forward/Spot ($D_1$--$M_6$) & RecurrentPPO / GTrXL & Zero-shot LLM (10-dim macro) & Multi-seed Walk-Forward (Strict $t-1$ lag) \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+The empirical question is whether news-derived sentiment adds information beyond physical fundamentals and numerical commodity variables, and whether any such information translates into an economically meaningful savings--risk trade-off under chronological evaluation. We address this question using a controlled feature-ablation design, econometric tests of conditional predictive content, rolling Walk-Forward evaluation, and comparisons with systematic forward-purchasing and partial-hedging baselines. We interpret the results as evidence about the evaluated Iberian market sample rather than as proof of a causal sentiment mechanism or universal robustness to regime changes.
+
+To address these challenges, this study develops and evaluates an adaptive reinforcement learning framework for sequential electricity procurement that integrates physical grid fundamentals, derivative quotations, and macroeconomic news sentiment. This study makes three bounded contributions:
+\begin{enumerate}
+    \item \textbf{Consumer-Side Multi-Horizon Procurement Formulation under Operational Delivery Constraints:} We formulate consumer-side electricity procurement as a sequential allocation problem across 14 spot and OMIP forward instruments ($D_1$--$M_6$), with delivery commitments, single-instrument physical settlement constraints, and cash flows represented explicitly in the decision environment.
+    \item \textbf{Econometric and Factorial Evaluation of Macroeconomic News Sentiment:} We evaluate the incremental predictive and decision value of news-derived macroeconomic sentiment relative to physical-system and quantitative commodity inputs, combining econometric tests of conditional predictive content (nested $F$-tests with HAC standard errors and Toda--Yamamoto Granger causality) with a controlled $2 \times 2$ factorial feature ablation.
+    \item \textbf{Longitudinal Retraining and Tail-Risk Benchmarking under Market Dislocation:} We compare dynamically re-trained procurement policies (evaluating feedforward, recurrent, and self-attention architectures across a multi-year Walk-Forward protocol) with single-contract forward heuristics and the industrial partial-hedging continuum ($\alpha \cdot D_2 + (1-\alpha) \cdot \text{SPOT}$) under an observed 2026 price-dislocation episode, reporting both simulated savings point estimates, paired bootstrap confidence intervals, and downside-risk measures ($\sigma_-$, Max DD, CVaR).
+\end{enumerate}
+The contribution is therefore an empirical assessment of information value and risk--return trade-offs in a specific procurement setting; it does not assume that multimodal inputs necessarily outperform simpler baselines.
+
+The remainder of this paper is organised as follows.
+\Cref{sec:methodology} details the proposed methodology, including the MDP formulation, 
+the LLM sentiment pipeline, and the RecurrentPPO agent.
+\Cref{sec:data_analysis} presents the dataset characterisation and statistical
+marginal distributional shift validation.
+\Cref{sec:results} reports the experimental results of the evaluated policies under both stable 
+and shock market conditions.
+\Cref{sec:discussion} discusses implications, limitations, and the interpretability 
+of learned policy decisions. Finally, \Cref{sec:conclusion} concludes the paper.

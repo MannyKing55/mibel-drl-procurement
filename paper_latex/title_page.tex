@@ -1,0 +1,77 @@
+\documentclass[preprint,12pt]{elsarticle}
+
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+\journal{Engineering Applications of Artificial Intelligence}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Adaptive Multi-Horizon Electricity Procurement Using Reinforcement Learning and Macroeconomic News Sentiment}
+
+\author[inst1]{Manel Mart{\'i}nez-Retamal}
+\ead{manel.martinez@uah.es}
+
+\author[inst2]{David Gualda}
+\ead{david.gualda@urjc.es}
+
+\author[inst1]{Reinier Herrera-Casanova}
+\ead{reinier.herrera@uah.es}
+
+\author[inst3]{Leonardo Pe\~na-Pupo}
+\ead{lpepup@utu.fi}
+
+\author[inst1]{Carlos Santos-P{\'e}rez\corref{cor1}}
+\ead{carlos.santos@uah.es}
+\cortext[cor1]{Corresponding author. Full postal address: Department of Signal Processing and Communications, Universidad de Alcal{\'a}, Campus Universitario, Ctra. Madrid-Barcelona km 33.6, 28805 Alcal{\'a} de Henares, Madrid, Spain.}
+
+\affiliation[inst1]{organization={Department of Signal Processing and Communications, Universidad de Alcal{\'a}},
+             addressline={Campus Universitario, Ctra. Madrid-Barcelona km 33.6},
+             city={Alcal{\'a} de Henares},
+             postcode={28805},
+             state={Madrid},
+             country={Spain}}
+
+\affiliation[inst2]{organization={Department of Signal Theory and Communications, Telematics and Computing Systems, Universidad Rey Juan Carlos},
+             addressline={Camino del Molino s/n},
+             city={Fuenlabrada},
+             postcode={28943},
+             state={Madrid},
+             country={Spain}}
+
+\affiliation[inst3]{organization={Finland Futures Research Centre, Turku School of Economics, University of Turku},
+             city={Turku},
+             postcode={20014},
+             country={Finland}}
+
+\end{frontmatter}
+
+\section*{CRediT authorship contribution statement}
+\textbf{Manel Mart{\'i}nez-Retamal:} Conceptualization, Methodology, Software, Formal analysis, Investigation, Data curation, Writing -- Original Draft, Visualization. \\
+\textbf{David Gualda:} Conceptualization, Methodology, Software, Validation, Supervision, Writing -- Review \& Editing. \\
+\textbf{Reinier Herrera-Casanova:} Formal analysis, Validation, Writing -- Review \& Editing. \\
+\textbf{Leonardo Pe\~na-Pupo:} Methodology, Formal analysis, Writing -- Review \& Editing. \\
+\textbf{Carlos Santos-P{\'e}rez:} Conceptualization, Methodology, Supervision, Validation, Writing -- Review \& Editing, Funding acquisition.
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+\section*{Declaration of generative AI and AI-assisted technologies in the manuscript preparation process}
+During the preparation of this work, the authors utilized Meta Llama-3 8B Instruct (quantized Q4\_K\_M, executed locally via Ollama v0.1.32) solely as an empirical natural language processing instrument to extract zero-shot continuous sentiment dimensions from daily macroeconomic news as state variables in the reinforcement learning environment. In addition, Anthropic Claude 3.5 Sonnet was used to assist in the conceptualization and layout design of the workflow schematic in Figure 9. The Graphical Abstract was developed entirely programmatically in Python using Matplotlib without text-to-image generative tools, in full compliance with Elsevier editorial policy. For manuscript preparation, Anthropic Claude 3.5 Sonnet and OpenAI ChatGPT (GPT-4o) were used solely for English language proofreading, grammar refinement, and readability improvements. After using these tools, the authors reviewed, verified, and edited all content, formulas, statistical tests, and data tables, and take full responsibility for the integrity and content of the published article.
+
+\section*{Acknowledgements and Funding Sources}
+This work was supported by:
+\begin{itemize}
+    \item The PREDFLEX-CM project (TEC-2024/ECO-287), funded by the Comunidad de Madrid through the R\&D activities programme ``Tecnolog\'ias 2024''.
+    \item The UrbanFlex project (CM/DEMG/2024-030), funded by the Comunidad de Madrid through the convenio-subvenci\'on for the promotion of research and technology transfer at the Universidad de Alcal\'a.
+    \item The RuralH2Verde project (SBPLY/24/180225/000198), funded by the European Union through the European Regional Development Fund (ERDF) and by the Castilla-La Mancha Agency for Research and Innovation (INNOCAM).
+    \item The GEMECOP project (PID2022-139575OB-I00), funded by the Spanish Ministry of Science and Innovation.
+    \item The VOLTAIRE project (CPP2023-010861), funded by the Ministry of Science and Innovation (MCIN\slash AEI\slash 10.13039\slash 501100011033) and the European Union NextGenerationEU/PRTR through the ``Proyectos de Colaboraci\'on P\'ublico Privada 2023'' programme.
+    \item The project ``Gesti\'on adaptativa de la congesti\'on en redes de distribuci\'on mediante flexibilidad distribuida y control aperi\'odico'' (PID2025-175026OB-I00), funded by the Spanish Ministry of Science, Innovation and Universities / Agencia Estatal de Investigaci\'on (MCIN\slash AEI\slash 10.13039\slash 501100011033).
+\end{itemize}
+
+\end{document}

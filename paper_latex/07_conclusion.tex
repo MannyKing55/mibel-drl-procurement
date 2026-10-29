@@ -1,0 +1,11 @@
+% ── Section 7: Conclusion ───────────────────────────────────────────────────
+\section{Conclusion}
+\label{sec:conclusion}
+
+This study evaluated a sequential framework for consumer-side electricity procurement across spot and OMIP forward contracts, combining physical system variables, quoted derivative prices, and macroeconomic news sentiment extracted with a large language model. The empirical analysis provides three primary findings.
+
+First, econometric tests indicate that news-derived sentiment contains conditional predictive information for forward basis dynamics beyond physical variables and quantitative commodity indicators. In the 2025 single-seed ablation, adding sentiment to the physical baseline yielded an increase in simulated savings (from $7.48\%$ to $11.66\%$), whereas combining sentiment with commodity features showed a negative descriptive interaction ($-2.59$~pp), indicating that information from these feature blocks is not simply additive.
+
+Second, during the evaluated 2026 price-dislocation window, the re-trained M8-W1 policy achieved positive simulated savings ($+6.32\%$) and lower downside semi-deviation ($9.15$ vs $13.68$~\texteuro/MWh) and lower maximum drawdown ($186.45$ vs $225.45$ \texteuro/MWh) than passive $D_2$, while $D_2$ achieved greater nominal savings ($+11.18\%$). Pairwise confidence intervals do not establish that M8-W1 delivers higher savings than either $D_2$ or a balanced 50/50 partial hedge ($+5.59\%$, 95\% CI: $[-3.10, +5.91]$~pp). The evidence is thus consistent with a potential risk--return trade-off from dynamic multi-horizon allocation under the conditions evaluated, not with unconditional economic superiority or a general anti-fragile property.
+
+Finally, frequent rolling retraining was associated with sustained positive simulated performance under market transitions: updating policy networks on recent historical windows maintained positive savings when historical correlations between power prices and international fossil commodities decoupled. Further work should replicate the factorial ablation across multiple random seeds, incorporate dimension-matched noise controls, validate the sentiment signals against domain-expert annotations, and evaluate additional out-of-sample market regimes and non-linear order-book execution frictions.

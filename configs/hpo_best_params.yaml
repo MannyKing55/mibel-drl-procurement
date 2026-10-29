@@ -1,0 +1,44 @@
+# Best Hyperparameters identified via Bayesian Optimization (Optuna, 50 trials)
+# Evaluated on Dataset_M8_Physical_NLP (Phase 4 Capacity Analysis)
+
+lstm_hybrid:
+  learning_rate: 3.09e-4
+  n_steps: 219
+  batch_size: 87
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0100
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  policy_kwargs:
+    lstm_hidden_size: 128
+    n_lstm_layers: 2
+    net_arch:
+      pi: [128, 64]
+      vf: [128, 64]
+
+gtrxl_hybrid:
+  learning_rate: 3.90e-5
+  n_steps: 157
+  batch_size: 119
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0137
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  policy_kwargs:
+    d_model: 128
+    nhead: 4
+    num_layers: 3
+    dim_feedforward: 256
+    dropout: 0.1
+
+market_environment:
+  baseload_mwh_day: 4800.0  # 200 MW continuous baseload
+  max_inventory_days: 101
+  transaction_cost_pct: 0.0015 # 0.15% fee + bid-ask spread margin
+  inventory_penalty_coef: 0.01

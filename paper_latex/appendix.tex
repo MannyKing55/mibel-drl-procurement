@@ -1,0 +1,114 @@
+\appendix
+\section{Continuous Walk-Forward Retraining Algorithm}
+\label{app:walk_forward}
+
+This appendix provides the formal algorithmic specification of the continuous Walk-Forward rolling retraining protocol described in Section~\ref{sec:methodology} and illustrated in \cref{fig:walk_forward_protocol}.
+
+\bigskip
+\begin{algorithm*}[t]
+\caption{Continuous Walk-Forward Rolling Retraining Protocol}
+\label{alg:walk_forward}
+\footnotesize
+\begin{algorithmic}[1]
+\Require Multi-year market dataset $\mathcal{D}$, rolling update window $W \in \{1, 3, 6, 12\}$ months, evaluation step $h = 1$ month, PPO rollout steps $K = 15{,}000$, evaluation seeds $\mathcal{S} = \{10, 20, 30, 40, 50\}$.
+\Ensure Multi-seed evaluation trajectories $\{\mathcal{H}_{\text{eval}}^{(s)}\}_{s \in \mathcal{S}}$, aggregate percentage savings $S_{\%}$, cumulative savings $S_{\text{cum}}$, downside risk $\sigma_-$, and $\text{CVaR}_{0.95}$.
+
+\Statex
+\For{\textbf{each} random evaluation seed $s \in \mathcal{S}$}
+    \State Set deterministic seeds for PyTorch, NumPy, Python random, and gym environment to $s$.
+    \State Initialize persistent physical/financial inventory state $\mathbf{c}_{\text{eval}} \leftarrow \mathbf{0}_{H}$, action mask $\mathbf{m}_{\text{eval}} \leftarrow \mathbf{0}_{H}$, policy network $\pi_\theta \leftarrow \text{None}$.
+    \State Partition multi-year market timeline (2023--2026) into $B = 41$ consecutive monthly calendar blocks $\{M_1, M_2, \dots, M_B\}$.
+    
+    \Statex
+    \Statex \textbf{\quad\textit{// --- Rolling Monthly Walk-Forward Retraining and Out-of-Sample Execution ---}}
+    \For{\textbf{each} out-of-sample evaluation block index $b = W+1$ \textbf{to} $B$}
+        \State Define rolling historical training slice: $\mathcal{D}_{\text{train}}^{(b)} \leftarrow \{M_{b-W}, \dots, M_{b-1}\}$ ($W$ preceding calendar months).
+        \State Define sequentially out-of-sample evaluation slice: $\mathcal{D}_{\text{eval}}^{(b)} \leftarrow M_b$ (subsequent 1-month evaluation block).
+        \State Fit causal standard scaler $\mathcal{S}_b$ strictly on $\mathcal{D}_{\text{train}}^{(b)}$ (strictly preventing look-ahead data leakage).
+        \State Transform training and evaluation slices: $\widetilde{\mathcal{D}}_{\text{train}}^{(b)} \leftarrow \mathcal{S}_b(\mathcal{D}_{\text{train}}^{(b)})$, $\widetilde{\mathcal{D}}_{\text{eval}}^{(b)} \leftarrow \mathcal{S}_b(\mathcal{D}_{\text{eval}}^{(b)})$.
+        \State Instantiate training simulation environment $\mathcal{E}_{\text{train}}(\widetilde{\mathcal{D}}_{\text{train}}^{(b)})$ with temporary episodic inventory reset $\mathbf{c}_{\text{train}} \leftarrow \mathbf{0}_H$.
+        
+        \If{$\pi_\theta$ is $\text{None}$}
+            \State Initialize policy network $\pi_\theta$ with selected neural architecture weights $\theta$ (RecurrentPPO LSTM or GTrXL Transformer).
+        \Else
+            \State Bind policy $\pi_\theta$ to training environment $\mathcal{E}_{\text{train}}$ (\textit{warm-start continuous policy fine-tuning}).
+        \EndIf
+        
+        \State Fine-tune policy $\pi_\theta$ for $K = 15{,}000$ environment interaction steps via PPO gradient updates over $\widetilde{\mathcal{D}}_{\text{train}}^{(b)}$.
+        \State Freeze policy weights $\pi_\theta$ and fitted scaler $\mathcal{S}_b$.
+        
+        \Statex
+        \Statex \textbf{\quad\quad\textit{// --- Out-of-Sample Sequential Trading and Settlement Valuation (Inside Block $b$) ---}}
+        \State Instantiate evaluation environment $\mathcal{E}_{\text{eval}}(\widetilde{\mathcal{D}}_{\text{eval}}^{(b)})$ and inject real persistent physical inventory $\mathbf{c}_{\text{eval}}$ and active forward mask $\mathbf{m}_{\text{eval}}$.
+        \State Reset $\mathcal{E}_{\text{eval}}$ with 20-day historical lookback buffer ($t_{\text{start}} = 20$), cleanly resetting latent recurrent state $h_0 \leftarrow \mathbf{0}$ (\texttt{episode\_starts = True}).
+        
+        \For{\textbf{each} out-of-sample delivery day $t = 21$ \textbf{to} $|\mathcal{D}_{\text{eval}}^{(b)}|$}
+            \State Settle mature forward baseload commitments delivered on day $t$ from index $\mathbf{c}_{\text{eval}}(1)$.
+            \If{OMIP derivatives market is open on day $t$ (active trading session)}
+                \State Select deterministic forward contract action: $a_t = \arg\max_a \pi_\theta(a \mid \mathbf{o}_t, h_{t-1})$.
+                \State Value the selected forward exposure at official OMIP settlement quote $P_{a_t, t}$ and update committed inventory $\mathbf{c}_{\text{eval}}^+$.
+            \Else \Comment{Weekend, public holiday, or market closure}
+                \State Set fallback action to \texttt{NO\_TRADE} ($a_t = \text{SPOT}$); fulfill unhedged base load at OMIE spot pool clearing price $P_{\text{SPOT}, t}$.
+            \EndIf
+            \State Step environment: advance delivery queue $\mathbf{c}_{\text{eval}}(\delta) \leftarrow \mathbf{c}_{\text{eval}}^+(\delta+1)$ for $\delta \in \{1, \dots, H-1\}$.
+            \State Record daily effective unit procurement cost $P_{\text{eff}, t}$, spot benchmark $P_{\text{SPOT}, t}$, and action $a_t$ in trajectory $\mathcal{H}_{\text{eval}}^{(s)}$.
+        \EndFor
+        \State Propagate ending evaluation inventory state into next monthly block: $\mathbf{c}_{\text{eval}} \leftarrow \mathcal{E}_{\text{eval}}.\mathbf{c}$, $\mathbf{m}_{\text{eval}} \leftarrow \mathcal{E}_{\text{eval}}.\mathbf{m}$.
+    \EndFor
+\EndFor
+
+\Statex
+\Statex \textbf{\textit{// --- Multi-Seed Robustness Aggregation ---}}
+\State Compute 5-seed cross-sectional mean trajectory $\overline{\mathcal{H}}_{\text{eval}}$ and multi-seed standard deviation ($\pm \sigma$) across all independent runs $\{\mathcal{H}_{\text{eval}}^{(s)}\}_{s \in \mathcal{S}}$.
+\State Compute percentage savings $S_{\%}$, cumulative differential $S_{\text{cum}}$, downside semi-deviation $\sigma_-$, and $\text{CVaR}_{0.95}$ via Eqs.~\eqref{eq:metric_savings_pct}--\eqref{eq:metric_cvar}.
+\end{algorithmic}
+\end{algorithm*}
+
+\clearpage
+
+\section{Moving-Block Bootstrap and Pooled Block-Bootstrap Null Testing Procedure}
+\label{app:block_bootstrap}
+
+To account for strong serial autocorrelation, multi-day memory, and day-of-week seasonality inherent in daily electricity time series, we utilize a Moving-Block Bootstrap (MBB) and pooled block-bootstrap null testing procedure \cite{kunsch1989jackknife, politis1994stationary} to evaluate statistical differences between temporal market regimes without imposing asymptotic independent and identically distributed (i.i.d.) assumptions.
+
+\bigskip
+\begin{algorithm*}[t]
+\caption{Moving-Block Bootstrap and Pooled Block-Bootstrap Null Hypothesis Test}
+\label{alg:block_bootstrap}
+\footnotesize
+\begin{algorithmic}[1]
+\Require Baseline daily series $\mathcal{X} = \{x_1, \dots, x_{n_1}\}$, comparison daily series $\mathcal{Y} = \{y_1, \dots, y_{n_2}\}$, block length $b = 7$ calendar days, bootstrap resamples $B = 5{,}000$, joint significance threshold $\alpha_{\text{joint}} = 0.00357$.
+\Ensure Observed two-sample KS statistic $D_{\text{obs}}$, empirical 95\% bootstrap confidence interval $[D_{0.025}^*, D_{0.975}^*]$, and empirical pooled block-bootstrap $p$-value $p_{\text{emp}}$.
+
+\Statex
+\Statex \textbf{\textit{// --- Step 1: Compute Observed Test Statistic ---}}
+\State Compute empirical cumulative distribution functions $F_{n_1}(u) = \frac{1}{n_1} \sum_{i=1}^{n_1} \mathbb{I}(x_i \le u)$ and $G_{n_2}(u) = \frac{1}{n_2} \sum_{j=1}^{n_2} \mathbb{I}(y_j \le u)$.
+\State Evaluate observed two-sample Kolmogorov--Smirnov statistic:
+\Statex \qquad $D_{\text{obs}} = \sup_{u \in \mathbb{R}} |F_{n_1}(u) - G_{n_2}(u)|$.
+
+\Statex
+\Statex \textbf{\textit{// --- Step 2: Moving-Block Bootstrap Confidence Interval for $D$ ---}}
+\State Extract overlapping temporal blocks of length $b$:
+\Statex \qquad $\mathcal{B}_{\mathcal{X}} = \{ (x_i, \dots, x_{i+b-1}) : 1 \le i \le n_1 - b + 1 \}$, \quad $\mathcal{B}_{\mathcal{Y}} = \{ (y_j, \dots, y_{j+b-1}) : 1 \le j \le n_2 - b + 1 \}$.
+\For{$k = 1$ \textbf{to} $B$}
+    \State Sample $\lceil n_1 / b \rceil$ blocks with replacement from $\mathcal{B}_{\mathcal{X}}$ and concatenate to form synthetic series $\mathcal{X}^{*(k)}$ of length $n_1$.
+    \State Sample $\lceil n_2 / b \rceil$ blocks with replacement from $\mathcal{B}_{\mathcal{Y}}$ and concatenate to form synthetic series $\mathcal{Y}^{*(k)}$ of length $n_2$.
+    \State Compute bootstrap statistic $D_k^* = \sup_{u} |F_{n_1}^{*(k)}(u) - G_{n_2}^{*(k)}(u)|$.
+\EndFor
+\State Derive empirical 95\% bootstrap confidence interval as the 2.5th and 97.5th percentiles of $\{D_k^*\}_{k=1}^B$: $[D_{0.025}^*, D_{0.975}^*]$.
+
+\Statex
+\Statex \textbf{\textit{// --- Step 3: Pooled Block-Bootstrap Test under Null Hypothesis $H_0: F = G$ ---}}
+\State Pool combined time series $\mathcal{Z} = \mathcal{X} \cup \mathcal{Y}$ of total length $N = n_1 + n_2$.
+\State Extract all overlapping blocks of length $b$ from pooled series: $\mathcal{B}_{\mathcal{Z}} = \{ (z_\ell, \dots, z_{\ell+b-1}) : 1 \le \ell \le N - b + 1 \}$.
+\For{$k = 1$ \textbf{to} $B$}
+    \State Resample $\lceil n_1 / b \rceil$ blocks with replacement from $\mathcal{B}_{\mathcal{Z}}$ to form pseudo-null baseline series $\mathcal{X}_{\text{null}}^{*(k)}$ of length $n_1$.
+    \State Resample $\lceil n_2 / b \rceil$ blocks with replacement from $\mathcal{B}_{\mathcal{Z}}$ to form pseudo-null comparison series $\mathcal{Y}_{\text{null}}^{*(k)}$ of length $n_2$.
+    \State Compute pseudo-null test statistic under $H_0$: $D_{\text{null}, k}^* = \sup_{u} |F_{\mathcal{X}_{\text{null}}^{*(k)}}(u) - G_{\mathcal{Y}_{\text{null}}^{*(k)}}(u)|$.
+\EndFor
+\State To avoid a zero-valued empirical $p$-value when no bootstrap replicate exceeds the observed statistic, the finite-sample estimator is computed as:
+\Statex \qquad $p_{\text{emp}} = \frac{1 + \sum_{k=1}^B \mathbb{I}\left(D_{\text{null}, k}^* \ge D_{\text{obs}}\right)}{B + 1}$.
+\Statex With $B = 5{,}000$ and zero exceedances ($\sum_{k=1}^B \mathbb{I}(D_{\text{null}, k}^* \ge D_{\text{obs}}) = 0$), $p_{\text{emp}} = \frac{1}{5{,}001} \approx 0.00019996$, which is reported throughout the text as $p_{\text{emp}} \le 0.0002$.
+\State Reject null hypothesis $H_0$ if $p_{\text{emp}} \le \alpha_{\text{joint}}$ (where $\alpha_{\text{joint}} = 0.05 / 14 \approx 0.00357$).
+\end{algorithmic}
+\end{algorithm*}
