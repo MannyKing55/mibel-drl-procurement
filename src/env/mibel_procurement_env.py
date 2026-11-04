@@ -1,117 +1,277 @@
+"""
+Canonical Gymnasium Environment for Multi-Horizon Electricity Procurement in MIBEL.
+Used for all experiments in:
+"Adaptive Multi-Horizon Electricity Procurement Using Reinforcement Learning
+ and Macroeconomic News Sentiment" (Elsevier EAAI).
+"""
+import calendar
+from datetime import date, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import pandas as pd
 
-class MIBELEnergyProcurementEnv(gym.Env):
+
+class MibelProcurementEnv(gym.Env):
     """
-    Gymnasium Environment for Multi-Horizon Industrial Electricity Procurement in MIBEL.
-    Supports 14 discrete forward and spot procurement actions with explicit physical delivery inventory.
+    Gymnasium Decision Environment for Industrial Electricity Procurement in MIBEL.
+
+    Observation Space (Box, shape=(715,)):
+      - 7-day lookback window of 45 normalized market, grid, and sentiment features (315 features).
+      - 400-day forward procurement inventory vector (400 positions).
+        Unhedged positions are encoded with the sentinel value -10.0.
+        Covered forward positions are normalized via Z-score standardisation.
+      - Total observation dimension: 45 * 7 + 400 = 715.
+
+    Action Space (Discrete(14)):
+      - 0: Passive SPOT procurement for delivery on day T+1 (default unhedged clearing).
+      - 1: D1 (1-day ahead forward, delivery on T+1).
+      - 2: D2 (2-day ahead forward, delivery on T+2).
+      - 3: D3 (3-day ahead forward, delivery on T+3).
+      - 4-7: W1 to W4 (Weekly forward contracts, covering Monday-Sunday of ISO weeks 1 to 4).
+      - 8-13: M1 to M6 (Monthly forward contracts, covering calendar months 1 to 6).
+
+    Execution and Constraints:
+      - Overlapping forward actions are rejected without modifying existing contracts.
+      - An invalid action penalty of lambda_pen = -20.0 EUR/MWh is applied for overlapping or out-of-bounds orders.
+      - Canonical baseload demand: E_load = 24.0 MWh/day (corresponding to 1 MW industrial baseload).
+      - Transaction costs: configurable via transaction_cost_eur_mwh (default 0.0, evaluating 0.10 and 0.25 EUR/MWh).
     """
+
     metadata = {"render_modes": ["human"]}
+    INVALID_PENALTY = -20.0
 
     def __init__(
         self,
         df: pd.DataFrame,
-        baseload_mwh_day: float = 4800.0,
-        max_inventory_days: int = 101,
-        transaction_cost_pct: float = 0.0015,
-        inventory_penalty_coef: float = 0.01,
-        lookback_lags: int = 7
+        scaler: Optional[Dict[str, Any]] = None,
+        initial_inventory: Optional[np.ndarray] = None,
+        initial_inventory_source: Optional[np.ndarray] = None,
+        baseload_mwh_day: float = 24.0,
+        transaction_cost_eur_mwh: float = 0.0,
+        inventory_size: int = 400,
+        window_size: int = 7,
     ):
         super().__init__()
         self.df = df.reset_index(drop=True)
-        self.baseload = baseload_mwh_day
-        self.max_inv_days = max_inventory_days
-        self.tc_pct = transaction_cost_pct
-        self.penalty_coef = inventory_penalty_coef
-        self.lookback = lookback_lags
+        if "Date" in self.df.columns and not pd.api.types.is_datetime64_any_dtype(self.df["Date"]):
+            self.df["Date"] = pd.to_datetime(self.df["Date"])
 
-        # Action space: 14 discrete actions
-        # 0: Pure SPOT default (no forward hedge)
-        # 1-3: Daily forwards D1, D2, D3
-        # 4-7: Weekly forwards W1, W2, W3, W4
-        # 8-13: Monthly forwards M1, M2, M3, M4, M5, M6
+        self.n_steps = len(self.df)
+        self.inventory_size = inventory_size
+        self.window_size = window_size
+        self.baseload_mwh_day = float(baseload_mwh_day)
+        self.transaction_cost_eur_mwh = float(transaction_cost_eur_mwh)
         self.action_space = spaces.Discrete(14)
 
-        # Feature observation columns (excluding Date)
-        self.feature_cols = [c for c in df.columns if c not in ['Date']]
-        self.num_market_features = len(self.feature_cols)
+        self.initial_inventory = initial_inventory
+        self.initial_inventory_source = initial_inventory_source
 
-        # State space: [Market features over lookback L, Inventory vector m_t(h)]
-        total_dim = (self.num_market_features * self.lookback) + self.max_inv_days
-        self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(total_dim,), dtype=np.float32
+        # Identify numerical feature columns
+        self.feature_cols: List[str] = [
+            c for c in self.df.columns
+            if self.df[c].dtype in [np.float64, np.int64, np.float32, np.int32]
+            and c not in ["Date"]
+        ]
+        features_raw = self.df[self.feature_cols].values.astype(np.float32)
+
+        # Feature standardisation statistics
+        self.global_price_mean = np.float32(0.0)
+        self.global_price_std = np.float32(1.0)
+        mean_vec = np.zeros(len(self.feature_cols), dtype=np.float32)
+        std_vec = np.ones(len(self.feature_cols), dtype=np.float32)
+
+        if scaler is not None:
+            self.global_price_mean = np.float32(scaler.get("global_price_mean", 0.0))
+            self.global_price_std = np.float32(scaler.get("global_price_std", 1.0))
+            stats = scaler.get("feature_stats", {})
+            for i, col in enumerate(self.feature_cols):
+                if col in stats:
+                    mean_vec[i], std_vec[i] = stats[col]
+                else:
+                    mean_vec[i] = self.global_price_mean
+                    std_vec[i] = self.global_price_std
+
+        std_vec_safe = np.where(std_vec == 0, 1.0, std_vec)
+        self.features_array = (features_raw - mean_vec) / std_vec_safe
+        self.features_array = np.nan_to_num(self.features_array, nan=0.0).astype(np.float32)
+
+        # Spot clearing prices
+        self.spot_prices = (
+            self.df["Precio_SPOT_ES"].values.astype(np.float32)
+            if "Precio_SPOT_ES" in self.df.columns
+            else np.zeros(self.n_steps, dtype=np.float32)
         )
 
-        self.current_step = 0
-        self.inventory = np.zeros(self.max_inv_days, dtype=np.float32)
+        # Contract matrix: D1..M6 (13 forward contracts)
+        contract_names = ["D1", "D2", "D3", "W1", "W2", "W3", "W4", "M1", "M2", "M3", "M4", "M5", "M6"]
+        self.contract_names = contract_names
+        n_contracts = len(contract_names)
+        self.contract_matrix = np.full((self.n_steps, n_contracts), np.nan, dtype=np.float32)
+        for j, c in enumerate(contract_names):
+            if c in self.df.columns:
+                self.contract_matrix[:, j] = self.df[c].values
+        self.contract_name_to_idx = {c: j for j, c in enumerate(contract_names)}
 
-    def reset(self, seed=None, options=None):
+        # Precompute forward contract start/end offsets and contract indices for each step
+        dates = self.df["Date"].tolist()
+        self.action_starts = np.full((self.n_steps, 14), -1, dtype=np.int32)
+        self.action_ends = np.full((self.n_steps, 14), -1, dtype=np.int32)
+        self.action_contract_idx = np.full((self.n_steps, 14), -1, dtype=np.int32)
+
+        for t in range(self.n_steps):
+            today = dates[t]
+            wd = today.weekday()  # Monday = 0, Sunday = 6
+            year, month = today.year, today.month
+
+            for a in range(1, 14):
+                if a == 1:
+                    s_off, e_off, cname = 1, 1, "D1"
+                elif a == 2:
+                    s_off, e_off, cname = 2, 2, "D2"
+                elif a == 3:
+                    s_off, e_off, cname = 3, 3, "D3"
+                elif 4 <= a <= 7:
+                    weeks_ahead = a - 3
+                    days_to_monday = (7 - wd) % 7
+                    if days_to_monday == 0:
+                        days_to_monday = 7
+                    s_off = days_to_monday + (weeks_ahead - 1) * 7
+                    e_off = s_off + 6
+                    cname = f"W{weeks_ahead}"
+                else:
+                    months_ahead = a - 7
+                    m = month - 1 + months_ahead
+                    y = year + m // 12
+                    m = m % 12 + 1
+                    first_day = date(y, m, 1)
+                    s_off = (first_day - today.date()).days
+                    last_day_num = calendar.monthrange(y, m)[1]
+                    last_day = date(y, m, last_day_num)
+                    e_off = (last_day - today.date()).days
+                    cname = f"M{months_ahead}"
+
+                if 0 <= s_off and e_off < self.inventory_size:
+                    self.action_starts[t, a] = s_off
+                    self.action_ends[t, a] = e_off
+                    self.action_contract_idx[t, a] = self.contract_name_to_idx.get(cname, -1)
+
+        # Sentinel value for unhedged forward inventory positions
+        self.inv_empty_val = np.float32(-10.0)
+
+        # Observation space definition: 45 * 7 + 400 = 715
+        self.obs_dim = (len(self.feature_cols) * self.window_size) + self.inventory_size
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(self.obs_dim,), dtype=np.float32
+        )
+        self._obs_buffer = np.empty(self.obs_dim, dtype=np.float32)
+
+    def reset(
+        self,
+        *,
+        seed: Optional[int] = None,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
         super().reset(seed=seed)
-        self.current_step = self.lookback
-        self.inventory = np.zeros(self.max_inv_days, dtype=np.float32)
+        self.current_step = 0
+
+        if self.initial_inventory is not None:
+            self.inventory = self.initial_inventory.copy()
+        else:
+            self.inventory = np.zeros(self.inventory_size, dtype=np.float32)
+
+        if self.initial_inventory_source is not None:
+            self.inventory_source = self.initial_inventory_source.copy()
+        else:
+            self.inventory_source = np.zeros(self.inventory_size, dtype=np.int8)
+
         return self._get_obs(), {}
 
-    def _get_obs(self):
-        # Extract historical market features window
-        feat_slice = self.df.iloc[self.current_step - self.lookback : self.current_step][self.feature_cols].values
-        feat_flat = feat_slice.flatten()
-        # Concatenate with current forward delivery inventory
-        obs = np.concatenate([feat_flat, self.inventory]).astype(np.float32)
-        return obs
+    def _get_obs(self) -> np.ndarray:
+        t = self.current_step
+        start = max(0, t - self.window_size + 1)
+        window = self.features_array[start : t + 1]
 
-    def step(self, action: int):
-        t_row = self.df.iloc[self.current_step]
-        spot_price = float(t_row['Precio_SPOT_ES'])
-        
-        # 1. Check if today was already covered by an existing forward contract
-        existing_coverage = self.inventory[0]
-        if existing_coverage > 0:
-            effective_price = existing_coverage
-            procurement_cost = effective_price * self.baseload
-        else:
-            effective_price = spot_price
-            procurement_cost = spot_price * self.baseload
+        if len(window) < self.window_size:
+            pad = np.tile(window[0], (self.window_size - len(window), 1))
+            window = np.vstack([pad, window])
 
-        # 2. Shift inventory by 1 day
-        self.inventory = np.roll(self.inventory, -1)
-        self.inventory[-1] = 0.0
+        n_feat = self.window_size * len(self.feature_cols)
+        self._obs_buffer[:n_feat] = window.ravel()
 
-        # 3. Apply selected action
-        action_cost = 0.0
+        norm_inv = self._obs_buffer[n_feat:]
+        norm_inv[:] = self.inv_empty_val
+        mask = self.inventory > 0
+        if mask.any() and self.global_price_std > 0:
+            norm_inv[mask] = (self.inventory[mask] - self.global_price_mean) / self.global_price_std
+
+        return self._obs_buffer.copy()
+
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+        reward = 0.0
+        info: Dict[str, Any] = {}
+        t = self.current_step
+        action_fee = 0.0
+
+        # 1. Execute action and enforce delivery constraints
         if action > 0:
-            contract_map = {
-                1: ('D1', 1, 1), 2: ('D2', 2, 1), 3: ('D3', 3, 1),
-                4: ('W1', 7, 7), 5: ('W2', 14, 7), 6: ('W3', 21, 7), 7: ('W4', 28, 7),
-                8: ('M1', 30, 30), 9: ('M2', 60, 30), 10: ('M3', 90, 30),
-                11: ('M4', 120, 30), 12: ('M5', 150, 30), 13: ('M6', 180, 30)
-            }
-            c_name, offset, duration = contract_map[action]
-            if c_name in t_row and not np.isnan(t_row[c_name]) and float(t_row[c_name]) > 0:
-                p_quote = float(t_row[c_name])
-                # Check overlap penalty
-                for d in range(offset - 1, min(offset - 1 + duration, self.max_inv_days)):
-                    if self.inventory[d] > 0:
-                        action_cost += self.penalty_coef * p_quote * self.baseload
-                    self.inventory[d] = p_quote
-                # Transaction fee
-                action_cost += self.tc_pct * p_quote * self.baseload * duration
+            s_idx = int(self.action_starts[t, action])
+            e_idx = int(self.action_ends[t, action])
+            c_idx = int(self.action_contract_idx[t, action])
 
-        # Reward = Spot Baseline Cost - Actual Total Cost
-        spot_baseline_cost = spot_price * self.baseload
-        total_cost = procurement_cost + action_cost
-        reward = (spot_baseline_cost - total_cost) / (spot_baseline_cost + 1e-6)
+            if s_idx < 0 or c_idx < 0:
+                reward += self.INVALID_PENALTY
+                info["invalid_reason"] = "Out_of_Bounds"
+            else:
+                price = self.contract_matrix[t, c_idx]
+                if np.isnan(price) or price <= 0:
+                    reward += self.INVALID_PENALTY
+                    info["invalid_reason"] = "NaN_price"
+                else:
+                    # Constraint: Overlapping forward orders are rejected without overwriting portfolio
+                    if np.any(self.inventory[s_idx : e_idx + 1] > 0):
+                        reward += self.INVALID_PENALTY
+                        info["invalid_reason"] = "Overlap"
+                    else:
+                        self.inventory[s_idx : e_idx + 1] = price
+                        self.inventory_source[s_idx : e_idx + 1] = action
+                        action_fee = self.transaction_cost_eur_mwh
+
+        # 2. Daily physical delivery and procurement cost
+        bot_cost = float(self.inventory[0])
+        spot_price = float(self.spot_prices[t])
+        if np.isnan(spot_price):
+            spot_price = 0.0
+
+        if bot_cost == 0:
+            bot_cost = spot_price
+            info["fuente_precio"] = "SPOT"
+        else:
+            info["fuente_precio"] = (
+                self.contract_names[int(self.inventory_source[0]) - 1]
+                if self.inventory_source[0] > 0
+                else "SPOT"
+            )
+
+        # Reward: Unit savings relative to Spot benchmark minus transaction friction
+        if spot_price > 0:
+            unit_saving = spot_price - bot_cost
+            reward += unit_saving - action_fee
+
+        info["spot_price"] = spot_price
+        info["effective_cost"] = bot_cost
+        info["unit_saving"] = spot_price - bot_cost
+        info["daily_procurement_cost_eur"] = bot_cost * self.baseload_mwh_day
+
+        # 3. Advance forward inventory by one delivery day
+        self.inventory[:-1] = self.inventory[1:]
+        self.inventory[-1] = 0.0
+        self.inventory_source[:-1] = self.inventory_source[1:]
+        self.inventory_source[-1] = 0
 
         self.current_step += 1
-        terminated = self.current_step >= len(self.df) - 1
-        truncated = False
+        done = self.current_step >= self.n_steps - 1
 
-        info = {
-            "spot_price": spot_price,
-            "effective_price": effective_price,
-            "spot_baseline_cost": spot_baseline_cost,
-            "total_cost": total_cost,
-            "savings_eur": spot_baseline_cost - total_cost
-        }
-        return self._get_obs(), reward, terminated, truncated, info
+        return self._get_obs(), float(reward), done, False, info
